@@ -20,7 +20,7 @@
         (cons new-block (split n rest-of-list))))))
 
 (defn pz [x]
-  (doall (map println (split 3 (map :c x)))))
+  (doall (map println (split 3 (map :z x)))))
 
 (def screen-dim 800)
 
@@ -79,13 +79,13 @@
   [(- (* x x) (* y y)) (* 2 x y)])
 
 (defn next-z [z c]
-  (+ (square-imaginary z) c))
+  (vec (map + (square-imaginary z) c)))
 
-(defn advance-elem [past-elem color-now]
-  (let [{:keys [z c color escaped]} past-elem
+(defn advance-elem [elem-old color-now]
+  (let [{:keys [z c color escaped]} elem-old
         new-z (next-z z c)]
     (cond
-      (escaped) {:z new-z
+      escaped {:z new-z
                  :c c
                  :color color
                  :escaped escaped}
@@ -98,18 +98,14 @@
              :color color
              :escaped false})))
 
-
-(defn do-mbrot-iters [[last-iter colors-list]]
-  (let [color-now (first colors-list) ]
+(defn do-mbrot-iters [[last-iter colors]]
+  (let [[color-now & colors-rest] colors]
     [(map advance-elem last-iter (repeat color-now)) 
-     (rest colors-list)]
+     colors-rest] 
     ))
 
 (defn mbrot-iters [divs]
-  (iterate do-mbrot-iters [(gen-init divs) colors]))  
-
-
-
+  (map first (iterate do-mbrot-iters [(gen-init divs) colors]))) 
 
 
 (comment
@@ -119,6 +115,30 @@
     (fn [] (let [cur-data (first @mbrot-iters)]
              (map draw-tiles with-coords cur-data) 
              (swap! mbrot-iters rest)))))
+)
+
+
+(def mbrot-iter-printer 
+  (let [x (mbrot-iters 3)]
+    (letfn [(pp [r] 
+                (fn bb [] 
+                  (pz (first r))
+                  (pp (rest r))))]
+      (pp x))))
+
+
+
+
+(comment
+
+(def mbrot-iter-printer (mbrot-iter-printer))
+
+(def x (mbrot-iters 3))
+
+(pz (first x))
+
+(pz (second x))
+
 
 
 
