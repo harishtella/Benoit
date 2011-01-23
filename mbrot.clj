@@ -108,16 +108,21 @@
   (map first (iterate do-mbrot-iters [(gen-init divs) colors]))) 
 
 
-(comment
-
-(defn mbrot-drawer [divs]
-  (let [mbrot-iters (atom (mbrot-iters divs))] 
-    (fn [] (let [cur-data (first @mbrot-iters)]
-             (map draw-tiles with-coords cur-data) 
-             (swap! mbrot-iters rest)))))
-)
 
 
+(defn add-coords-to-elem [dim-elem-count i elem]
+  (let [row (int (/ i dim-elem-count))
+        col (mod i dim-elem-count)]
+    (assoc elem 
+           :y (/ row dim-elem-count) 
+           :x (/ col dim-elem-count))))
+
+
+(defn with-coords [elems]
+  (let [dim-elem-count (sqrt (count elems))]   
+    (map-indexed (partial add-coords-to-elem dim-elem-count) elems)))
+
+  
 (def mbrot-iter-printer 
   (let [x (mbrot-iters 3)]
     (letfn [(pp [r] 
@@ -127,9 +132,48 @@
       (pp x))))
 
 
+(defn with-screen-coords [screen-size elems]
+  (map #(assoc %
+               :x (* (:x %) screen-size)
+               :y (* (:y %) screen-size))
+       elems))
+
+(defn draw-mbrot [elem-size elem] 
+  (let [{:keys [z c x y color escaped]} elem]
+    (apply fill-float color) 
+    (with-translation [x y]
+                      (begin-shape)
+                      (vertex 0 0)
+                      (vertex elem-size 0)
+                      (vertex elem-size elem-size)
+                      (vertex 0 elem-size)
+                      (end-shape CLOSE))))
+
+(def mbrot-drawer
+  (let [mbrot-data (atom (mbrot-iters 3))
+        elem-size (* (/ 1 (sqrt (count (first @mbrot-data)))) screen-dim)]
+    (fn [] 
+      (map (partial draw-mbrot elem-size) 
+           (with-screen-coords screen-dim
+                               (with-coords (first @mbrot-data))))
+      (swap! mbrot-data rest))))
+
 
 
 (comment
+
+(doall (map 
+  println 
+  (split 3 
+  (map #(select-keys % '(:x :y :c)) 
+  (with-screen-coords screen-dim (with-coords (first x)))))))
+
+(defn mbrot-drawer [divs]
+  (let [mbrot-iters (atom (mbrot-iters divs))] 
+    (fn [] (let [cur-data (first @mbrot-iters)]
+             (map draw-tiles with-coords cur-data) 
+             (swap! mbrot-iters rest)))))
+
 
 (def mbrot-iter-printer (mbrot-iter-printer))
 
@@ -139,15 +183,17 @@
 
 (pz (second x))
 
+)
 
-
-
+(def a (atom 200))
+(def b (atom 240))
+(def c (atom 120))
 
 (defn draw
   []
   (background-float 125)
   (stroke-float 10)
-  (fill-float (rand-int 125) (rand-int 125) (rand-int 125))
+  (fill-float @a @b @c)
   (with-translation [(/ 200 2) (/ 200 2)]
     (with-rotation [QUARTER_PI]
       (begin-shape)
@@ -165,10 +211,12 @@
   (fill 226)
   (framerate 10))
 
+
+
 (defapplet mb :title "mandelbrot"
-  :setup setup :draw draw :size [screen-dim screen-dim])
+  :setup setup :draw draw :size [screen-dim screen-dim]
+  )
 
 (run mb)
 ;; (stop mb)
   
-)
