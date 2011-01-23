@@ -28,7 +28,7 @@
   (repeatedly 
     #(list (rand-int 256) (rand-int 256) (rand-int 256))))
 
-(def base-color '(150 150 150))
+(def base-color '(0 150 0))
 
 ; this works but its not lazy and its a mess
 (defn gen-constants-board [divs]
@@ -121,7 +121,6 @@
 (defn with-coords [elems]
   (let [dim-elem-count (sqrt (count elems))]   
     (map-indexed (partial add-coords-to-elem dim-elem-count) elems)))
-
   
 (def mbrot-iter-printer 
   (let [x (mbrot-iters 3)]
@@ -150,18 +149,19 @@
                       (end-shape CLOSE))))
 
 (def mbrot-drawer
-  (let [mbrot-data (atom (mbrot-iters 3))
+  (let [mbrot-data (atom (mbrot-iters 80))
         elem-size (* (/ 1 (sqrt (count (first @mbrot-data)))) screen-dim)]
     (fn [] 
-      (map (partial draw-mbrot elem-size) 
+      (doall
+        (map (partial draw-mbrot elem-size) 
            (with-screen-coords screen-dim
-                               (with-coords (first @mbrot-data))))
+                               (with-coords (first @mbrot-data)))))
       (swap! mbrot-data rest))))
 
 
 
-(comment
 
+(comment
 (doall (map 
   println 
   (split 3 
@@ -182,40 +182,31 @@
 (pz (first x))
 
 (pz (second x))
-
 )
 
-(def a (atom 200))
-(def b (atom 240))
-(def c (atom 120))
+
+(defn key-pressed [evt]
+  (redraw))
 
 (defn draw
   []
-  (background-float 125)
-  (stroke-float 10)
-  (fill-float @a @b @c)
-  (with-translation [(/ 200 2) (/ 200 2)]
-    (with-rotation [QUARTER_PI]
-      (begin-shape)
-      (vertex -50  50)
-      (vertex  50  50)
-      (vertex  50 -50)
-      (vertex -50 -50)
-      (end-shape CLOSE)))
-  (filter-kind INVERT))
+  (mbrot-drawer)
+  )
 
 (defn setup []
   "Runs once."
   (smooth)
-  (no-stroke)
-  (fill 226)
-  (framerate 10))
+
+  (background-float 225)
+  (stroke-float 0)
+
+  (no-loop))
 
 
 
 (defapplet mb :title "mandelbrot"
   :setup setup :draw draw :size [screen-dim screen-dim]
-  )
+  :key-pressed key-pressed)
 
 (run mb)
 ;; (stop mb)
