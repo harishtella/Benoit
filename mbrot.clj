@@ -4,72 +4,36 @@
   (:use [rosado.processing]
         [rosado.processing.applet]))
 
-
-(defn split [n x]
-  (if x
-    (letfn [(make-block [n x]
-                        (if (> n 0) 
-                          (cons (first x) (make-block (dec n) (next x)))
-                          ()))
-            (get-rest-after [n x]
-                     (if (> n 0)
-                       (get-rest-after (dec n) (next x))
-                       x))]
-      (let [new-block (make-block n x)
-            rest-of-list (get-rest-after n x)]
-        (cons new-block (split n rest-of-list))))))
-
-(defn pz [x]
-  (doall (map println (split 3 (map :z x)))))
-
 (def screen-dim 800)
-
+(def mbrot-dim 256)
+(def base-color '(150 150 150))
 (def colors 
   (repeatedly 
     #(list (rand-int 256) (rand-int 256) (rand-int 256))))
 
-(def base-color '(0 150 0))
 
-; this works but its not lazy and its a mess
+; TODO app next z in parrallel
+; dont comput un needed'zs 
+
+; XXX what a better way to keep this DRY
+; XXX not lazy
 (defn gen-constants-board [divs]
   (let [step-size (/ 4 (dec divs))]
     (letfn [(gen-f [[x y]] 
-                   (cond 
-                     (= [x y] [2 -2]) ()
-                     (= x 2) (cons [-2 (- y step-size)] (gen-f [-2 (- y step-size)]))
-                     :else (cons [(+ x step-size) y] (gen-f [(+ x step-size) y]))))]
+                   (lazy-seq
+                     (cond 
+                       (= [x y] [2 -2]) ()
+                       (= x 2) (let [new-elem [-2 (- y step-size)]]
+                                 (cons new-elem (gen-f new-elem)))
+                       :else (let [new-elem [(+ x step-size) y]]
+                               (cons new-elem (gen-f new-elem))))))]
       (cons [-2 2] (gen-f [-2 2]))))) 
 
-(comment
-; causes null pointer error
-(defn gen-constants-board [divisions] 
-  (let [step-size (/ 4 (dec divisions))]
-    (letfn [(gen-f [[x y]] 
-                   (cond 
-                     (= [x y] [2 -2]) ()
-                     (= x 2) [-2 (- y step-size)]
-                     :else [(+ x step-size) y]))]
-      (iterate gen-f [-2 2]))))
+(defrecord elem [z c color escaped])
 
-; this wont work because let isn't recursive
-(defn gen-constants-board [divs]
-  (let [step-size (/ 4 (dec divs))]
-    (letfn [(gen-f [[x y]] 
-                   (cond 
-                     (= [x y] [2 -2]) ()
-                     (= x 2) [-2 (- y step-size)]
-                     :else [(+ x step-size) y]))]
-      (let [board-seq (lazy-seq
-                        (cons [-2 2] (gen-f (first board-seq))))]
-        board))))
-)
-   
 (defn gen-init [divisions]
   (map
-    (fn [x ] {:z [0 0]
-               :c x
-               :color base-color
-               :escaped false})
+    (fn [x ] (elem. [0 0] x base-color false))
     (gen-constants-board divisions)))
 
 (defn out-of-set [[x y]]
@@ -85,18 +49,9 @@
   (let [{:keys [z c color escaped]} elem-old
         new-z (next-z z c)]
     (cond
-      escaped {:z new-z
-                 :c c
-                 :color color
-                 :escaped escaped}
-      (out-of-set new-z) {:z new-z
-                          :c c
-                          :color color-now
-                          :escaped true}
-      :else {:z new-z
-             :c c
-             :color color
-             :escaped false})))
+      escaped (elem. new-z c color escaped)
+      (out-of-set new-z) (elem. new-z c color-now true)
+      :else (elem. new-z c color false))))
 
 (defn do-mbrot-iters [[last-iter colors]]
   (let [[color-now & colors-rest] colors]
@@ -107,9 +62,6 @@
 (defn mbrot-iters [divs]
   (map first (iterate do-mbrot-iters [(gen-init divs) colors]))) 
 
-
-
-
 (defn add-coords-to-elem [dim-elem-count i elem]
   (let [row (int (/ i dim-elem-count))
         col (mod i dim-elem-count)]
@@ -117,26 +69,16 @@
            :y (/ row dim-elem-count) 
            :x (/ col dim-elem-count))))
 
-
 (defn with-coords [elems]
   (let [dim-elem-count (sqrt (count elems))]   
     (map-indexed (partial add-coords-to-elem dim-elem-count) elems)))
-  
-(def mbrot-iter-printer 
-  (let [x (mbrot-iters 3)]
-    (letfn [(pp [r] 
-                (fn bb [] 
-                  (pz (first r))
-                  (pp (rest r))))]
-      (pp x))))
-
 
 (defn with-screen-coords [screen-size elems]
   (map #(assoc %
                :x (* (:x %) screen-size)
                :y (* (:y %) screen-size))
        elems))
-
+ 
 (defn draw-mbrot [elem-size elem] 
   (let [{:keys [z c x y color escaped]} elem]
     (apply fill-float color) 
@@ -149,7 +91,7 @@
                       (end-shape CLOSE))))
 
 (def mbrot-drawer
-  (let [mbrot-data (atom (mbrot-iters 80))
+  (let [mbrot-data (atom (mbrot-iters mbrot-dim))
         elem-size (* (/ 1 (sqrt (count (first @mbrot-data)))) screen-dim)]
     (fn [] 
       (doall
@@ -158,13 +100,42 @@
                                (with-coords (first @mbrot-data)))))
       (swap! mbrot-data rest))))
 
+(defn key-pressed [evt]
+  (redraw))
+(defn draw
+  []
+  (mbrot-drawer)
+  )
+(defn setup []
+  "Runs once."
+  (smooth)
+  (background-float 225)
+  (stroke-float 0)
+  (no-loop))
 
+(defapplet mb :title "mandelbrot"
+  :setup setup :draw draw :size [screen-dim screen-dim]
+  :key-pressed key-pressed)
 
+(run mb)
+;; (stop mb)
+ 
+
+(defn pz [x]
+  (doall (map println (partition 3 (map :z x)))))
+
+(def mbrot-iter-printer 
+  (let [x (mbrot-iters 3)]
+    (letfn [(pp [r] 
+                (fn bb [] 
+                  (pz (first r))
+                  (pp (rest r))))]
+      (pp x))))
 
 (comment
 (doall (map 
   println 
-  (split 3 
+  (partition 3 
   (map #(select-keys % '(:x :y :c)) 
   (with-screen-coords screen-dim (with-coords (first x)))))))
 
@@ -184,30 +155,4 @@
 (pz (second x))
 )
 
-
-(defn key-pressed [evt]
-  (redraw))
-
-(defn draw
-  []
-  (mbrot-drawer)
-  )
-
-(defn setup []
-  "Runs once."
-  (smooth)
-
-  (background-float 225)
-  (stroke-float 0)
-
-  (no-loop))
-
-
-
-(defapplet mb :title "mandelbrot"
-  :setup setup :draw draw :size [screen-dim screen-dim]
-  :key-pressed key-pressed)
-
-(run mb)
-;; (stop mb)
-  
+ 
