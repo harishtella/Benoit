@@ -1,0 +1,19 @@
+# benoit
+
+a simple mandelbrot set generator that leverages clojure's lazy lists.
+
+## Usage
+
+get the JRE and leiningen
+
+at the console run: 
+lein deps
+lein run
+
+sit back and enjoy the drawing
+
+## License
+
+Copyright (C) 2011 Harish Tella
+
+Distributed under the Eclipse Public License, the same as Clojure.

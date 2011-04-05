@@ -1,6 +1,6 @@
 ; take a stab at making a mandelbrot drawer
 
-(ns mbrot
+(ns benoit.mbrot
   (:use [rosado.processing]
         [rosado.processing.applet]))
 
@@ -138,7 +138,8 @@
   :setup setup :draw draw :size [screen-dim screen-dim]
   :key-pressed key-pressed)
 
-(run mb)
+(defn -main [& args]
+  (run mb))
 ;; (stop mb)
  
 
