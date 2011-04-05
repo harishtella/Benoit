@@ -4,9 +4,9 @@
   (:use [rosado.processing]
         [rosado.processing.applet]))
 
-(def screen-dim 800)
+(def screen-dim 512)
 (def mbrot-dim 256)
-(def base-color '(150 150 150))
+(def base-color '(0 0 0))
 (def colors 
   (repeatedly 
     #(list (rand-int 256) (rand-int 256) (rand-int 256))))
@@ -15,8 +15,25 @@
 ; TODO app next z in parrallel
 ; dont comput un needed'zs 
 
-; XXX what a better way to keep this DRY
-; XXX not lazy
+
+(defn iterate-with-end [f x] 
+  (let [next-x (f x)]
+    (if (= next-x ())
+      ;;; XXX fixed this bug
+      (list x)
+      (cons x (lazy-seq (iterate-with-end f next-x))))))
+      
+
+(defn gen-constants-board [divs]
+  (let [step-size (/ 4 (dec divs))]
+    (letfn [(gen-f [[x y]] 
+                     (cond 
+                       (= [x y] [2 -2]) ()
+                       (= x 2) [-2 (- y step-size)] 
+                       :else [(+ x step-size) y]))]
+      (iterate-with-end gen-f [-2 2])))) 
+
+(comment
 (defn gen-constants-board [divs]
   (let [step-size (/ 4 (dec divs))]
     (letfn [(gen-f [[x y]] 
@@ -28,6 +45,7 @@
                        :else (let [new-elem [(+ x step-size) y]]
                                (cons new-elem (gen-f new-elem))))))]
       (cons [-2 2] (gen-f [-2 2]))))) 
+  )
 
 (defrecord elem [z c color escaped])
 
@@ -46,12 +64,13 @@
   (vec (map + (square-imaginary z) c)))
 
 (defn advance-elem [elem-old color-now]
-  (let [{:keys [z c color escaped]} elem-old
-        new-z (next-z z c)]
-    (cond
-      escaped (elem. new-z c color escaped)
-      (out-of-set new-z) (elem. new-z c color-now true)
-      :else (elem. new-z c color false))))
+  (let [{:keys [z c color escaped]} elem-old]
+    (if escaped
+      elem-old
+      (let [new-z (next-z z c)]
+        (cond
+          (out-of-set new-z) (elem. new-z c color-now true)
+          :else (elem. new-z c color false))))))
 
 (defn do-mbrot-iters [[last-iter colors]]
   (let [[color-now & colors-rest] colors]
@@ -110,8 +129,10 @@
   "Runs once."
   (smooth)
   (background-float 225)
-  (stroke-float 0)
-  (no-loop))
+  ;(stroke-float 0)
+  (no-stroke)
+; (no-loop)
+  )
 
 (defapplet mb :title "mandelbrot"
   :setup setup :draw draw :size [screen-dim screen-dim]
